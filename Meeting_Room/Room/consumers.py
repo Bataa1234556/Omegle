@@ -1,72 +1,84 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
-from asgiref.sync import async_to_sync
 
-# Global pool to manage unpaired users
-unpaired_users = []
-
-class OmegleConsumer(AsyncWebsocketConsumer):
+class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        # Add the user to the global pool
-        self.room_group_name = None
-        unpaired_users.append(self)
+        self.room_name = self.scope['url_route']['kwargs']['room_name']
+        self.room_group_name = f'chat_{self.room_name}'
 
-        # Accept the connection
+        # Join the room group
+        await self.channel_layer.group_add(
+            self.room_group_name,
+            self.channel_name
+        )
+
         await self.accept()
 
-        # Try to pair the user
-        await self.pair_user()
+        # Get the current number of users in the room
+        users_in_room = len(await self.channel_layer.group_channels(self.room_group_name))
 
-    async def disconnect(self, close_code):
-        # Remove the user from the global pool if not paired
-        if self in unpaired_users:
-            unpaired_users.remove(self)
-
-        # Leave the room group if paired
-        if self.room_group_name:
-            await self.channel_layer.group_discard(
+        # Notify the current user if they are alone
+        if users_in_room == 1:
+            await self.send(text_data=json.dumps({
+                'notification': 'You are the first person in the room. Wait for someone to join.'
+            }))
+        else:
+            # Notify others that a new user has joined
+            await self.channel_layer.group_send(
                 self.room_group_name,
-                self.channel_name
+                {
+                    'type': 'user_joined',
+                    'message': f'A user has joined the chat. {users_in_room} users in the room.'
+                }
             )
 
+    async def disconnect(self, close_code):
+        # Notify others that a user has left
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'user_left',
+                'message': 'A user has left the chat.'
+            }
+        )
+
+        # Leave the room group
+        await self.channel_layer.group_discard(
+            self.room_group_name,
+            self.channel_name
+        )
+
     async def receive(self, text_data):
-        # Forward the message to the other user in the pair
-        if self.room_group_name:
+        data = json.loads(text_data)
+        message = data.get('message', '').strip()
+
+        if message:
+            # Broadcast message to other users
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
                     'type': 'chat_message',
-                    'message': text_data
+                    'message': message
                 }
             )
 
     async def chat_message(self, event):
-        # Send the message to the WebSocket
-        await self.send(text_data=event['message'])
+        message = event['message']
 
-    async def pair_user(self):
-        global unpaired_users
-        if len(unpaired_users) >= 2:
-            # Pair the first two users
-            user1 = unpaired_users.pop(0)
-            user2 = unpaired_users.pop(0)
+        # Send message to WebSocket
+        await self.send(text_data=json.dumps({
+            'type': 'message',
+            'message': message
+        }))
 
-            # Create a unique room for the pair
-            room_name = f"room_{id(user1)}_{id(user2)}"
+    async def user_joined(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'notification',
+            'message': event['message']
+        }))
 
-            # Add both users to the room
-            user1.room_group_name = room_name
-            user2.room_group_name = room_name
-
-            await self.channel_layer.group_add(
-                room_name,
-                user1.channel_name
-            )
-            await self.channel_layer.group_add(
-                room_name,
-                user2.channel_name
-            )
-
-            # Notify users they are paired
-            await user1.send(text_data=json.dumps({"message": "You are now connected to a stranger!"}))
-            await user2.send(text_data=json.dumps({"message": "You are now connected to a stranger!"}))
+    async def user_left(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'notification',
+            'message': event['message']
+        }))

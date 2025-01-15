@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Room</title>
+    <style>
+        body {
+            background: #f7f7f7;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        h2 {
+            font-size: 2rem;
+            color: #333;
+        }
+
+        textarea {
+            width: 80%;
+            height: 200px;
+            margin: 10px 0;
+            font-size: 1rem;
+        }
+
+        input {
+            width: 80%;
+            padding: 10px;
+            font-size: 1rem;
+            margin-bottom: 10px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 1rem;
+            color: white;
+            background-color: #007bff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        #chat-log {
+            animation: fadeInUp 1s ease;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <h2>You're now chatting in Room: {{ room_name }}</h2>
+    <textarea id="chat-log" readonly></textarea><br>
+    <input id="chat-message-input" type="text" placeholder="Type your message here..."><br>
+    <button id="chat-message-submit">Send</button>
+    
+    <!-- Hidden element to pass room_name to JavaScript -->
+    <div id="room-name" style="display: none;">{{ room_name }}</div>
+    {% load static%}
+
+    <!-- Link to the external JavaScript file -->
+    <script src="{% static 'js/chat.js' %}"></script>
+</body>
+</html>
+
