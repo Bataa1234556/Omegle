@@ -1,0 +1,28 @@
+<div>
+    <textarea id="chat-log" readonly rows="10" cols="50"></textarea><br>
+    <input id="chat-message-input" type="text" size="50"><br>
+    <button id="chat-message-submit">Send</button>
+</div>
+
+<script>
+    const chatSocket = new WebSocket(
+        'ws://' + window.location.host + '/ws/chat/'
+    );
+
+    chatSocket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        const chatLog = document.getElementById('chat-log');
+        chatLog.value += data.message + '\n';
+    };
+
+    chatSocket.onclose = function(e) {
+        console.error('Chat socket closed unexpectedly');
+    };
+
+    document.getElementById('chat-message-submit').onclick = function() {
+        const messageInput = document.getElementById('chat-message-input');
+        const message = messageInput.value;
+        chatSocket.send(JSON.stringify({ 'message': message }));
+        messageInput.value = '';
+    };
+</script>
